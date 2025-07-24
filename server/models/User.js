@@ -1,0 +1,79 @@
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
+  },
+  phone: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 6
+  },
+  role: {
+    type: String,
+    enum: ['user', 'manager', 'admin'],
+    default: 'user'
+  },
+  avatar: {
+    type: String
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  preferences: {
+    brands: [String],
+    priceRange: {
+      min: Number,
+      max: Number
+    },
+    bodyTypes: [String],
+    fuelTypes: [String]
+  },
+  address: {
+    street: String,
+    city: String,
+    region: String,
+    postalCode: String
+  },
+  lastLogin: {
+    type: Date
+  }
+}, {
+  timestamps: true
+});
+
+// Хеширование пароля перед сохранением
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Метод для проверки пароля
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
