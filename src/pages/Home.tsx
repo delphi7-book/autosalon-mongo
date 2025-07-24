@@ -1,55 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { usePopularCars, useNews } from '@/hooks/useApi';
+import { formatPrice, getImageUrl } from '@/lib/utils';
 import Icon from '@/components/ui/icon';
 
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const { data: popularCarsData, isLoading: carsLoading } = usePopularCars();
+  const { data: newsData, isLoading: newsLoading } = useNews({ limit: 3, status: 'published' });
 
-  const featuredCars = [
-    {
-      id: 1,
-      name: 'BMW 3 Series',
-      price: '2 890 000',
-      year: 2024,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '0',
-      type: 'Седан',
-      brand: 'BMW',
-      image: '/img/35658ce2-0e0f-41a4-a417-c35990cabc29.jpg',
-      features: ['Кожаный салон', 'Подогрев сидений', 'Навигация']
-    },
-    {
-      id: 2,
-      name: 'Audi Q5',
-      price: '3 450 000',
-      year: 2024,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '0',
-      type: 'Кроссовер',
-      brand: 'Audi',
-      image: '/img/b6e0d970-0bdc-442d-af99-f0a51ff0863e.jpg',
-      features: ['Полный привод', 'Панорамная крыша', 'LED фары']
-    },
-    {
-      id: 3,
-      name: 'Mercedes C-Class Coupe',
-      price: '4 120 000',
-      year: 2024,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '0',
-      type: 'Купе',
-      brand: 'Mercedes',
-      image: '/img/8da9e761-2e1b-453f-9c89-1afd4df236ee.jpg',
-      features: ['AMG пакет', 'Премиум звук', 'Автопилот']
-    }
-  ];
+  const featuredCars = popularCarsData?.slice(0, 3) || [];
+  const latestNews = newsData?.news || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,7 +34,7 @@ const Home = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1"
               />
-              <Link to="/catalog">
+              <Link to={`/catalog${searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : ''}`}>
                 <Button className="bg-primary hover:bg-primary/90">
                   <Icon name="Search" size={16} className="mr-2" />
                   Найти
@@ -87,50 +53,79 @@ const Home = () => {
             <p className="text-gray-600 text-lg">Лучшие предложения этого месяца</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredCars.map((car) => (
-              <Card key={car.id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden">
-                <div className="relative overflow-hidden">
-                  <img 
-                    src={car.image} 
-                    alt={car.name}
-                    className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <Badge className="absolute top-4 right-4 bg-primary">Хит продаж</Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-xl text-secondary">{car.name}</CardTitle>
-                  <div className="text-2xl font-bold text-primary">{car.price} ₽</div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <Icon name="Calendar" size={14} className="mr-2" />
-                      {car.year} год
+          {carsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <div className="h-64 bg-gray-200 rounded-t-lg"></div>
+                  <CardHeader>
+                    <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-8 bg-gray-200 rounded"></div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-10 bg-gray-200 rounded"></div>
                     </div>
-                    <div className="flex items-center">
-                      <Icon name="Zap" size={14} className="mr-2" />
-                      {car.fuel}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredCars.map((car) => (
+                <Card key={car._id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden">
+                  <div className="relative overflow-hidden">
+                    <img 
+                      src={getImageUrl(car.images[0])} 
+                      alt={car.name}
+                      className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-4 right-4 flex flex-col gap-2">
+                      {car.isHit && <Badge className="bg-primary">Хит продаж</Badge>}
+                      {car.isNew && <Badge className="bg-green-600">Новый</Badge>}
                     </div>
                   </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {car.features.slice(0, 2).map((feature, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        {feature}
-                      </Badge>
-                    ))}
-                  </div>
+                  <CardHeader>
+                    <CardTitle className="text-xl text-secondary">{car.name}</CardTitle>
+                    <div className="text-2xl font-bold text-primary">{formatPrice(car.price)} ₽</div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <Icon name="Calendar" size={14} className="mr-2" />
+                        {car.year} год
+                      </div>
+                      <div className="flex items-center">
+                        <Icon name="Zap" size={14} className="mr-2" />
+                        {car.fuel}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {car.features.slice(0, 2).map((feature, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {feature}
+                        </Badge>
+                      ))}
+                      {car.features.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{car.features.length - 2}
+                        </Badge>
+                      )}
+                    </div>
 
-                  <Link to={`/car/${car.id}`}>
-                    <Button className="w-full bg-primary hover:bg-primary/90">
-                      Подробнее
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <Link to={`/car/${car._id}`}>
+                      <Button className="w-full bg-primary hover:bg-primary/90">
+                        Подробнее
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-8">
             <Link to="/catalog">
@@ -143,8 +138,65 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Services Preview */}
+      {/* Latest News */}
       <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-secondary mb-4">Последние новости</h2>
+            <p className="text-gray-600 text-lg">Будьте в курсе всех событий AutoPremium</p>
+          </div>
+
+          {newsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                  <CardHeader>
+                    <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {latestNews.map((article) => (
+                <Card key={article._id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+                  <div className="relative overflow-hidden">
+                    <img 
+                      src={getImageUrl(article.featuredImage)} 
+                      alt={article.title}
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <Badge className="absolute top-4 left-4 bg-primary">
+                      {article.category}
+                    </Badge>
+                  </div>
+                  <CardHeader>
+                    <CardTitle className="text-lg line-clamp-2">{article.title}</CardTitle>
+                    <p className="text-gray-600 text-sm line-clamp-3">{article.excerpt}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                      <span>{new Date(article.publishDate).toLocaleDateString('ru-RU')}</span>
+                      <div className="flex items-center space-x-2">
+                        <Icon name="Eye" size={14} />
+                        <span>{article.views}</span>
+                      </div>
+                    </div>
+                    <Button variant="outline" className="w-full">
+                      Читать далее
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Services Preview */}
+      <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-secondary mb-4">Наши услуги</h2>

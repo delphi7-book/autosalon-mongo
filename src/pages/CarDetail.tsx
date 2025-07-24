@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,71 +7,100 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useCar, useSimilarCars, useCreateContact } from '@/hooks/useApi';
+import { formatPrice, getImageUrl } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
 
 const CarDetail = () => {
   const { id } = useParams();
   const [selectedImage, setSelectedImage] = useState(0);
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    message: ''
+  });
 
-  // В реальном приложении данные загружались бы по ID
-  const car = {
-    id: parseInt(id || '1'),
-    name: 'BMW 3 Series',
-    price: 2890000,
-    year: 2024,
-    fuel: 'Бензин',
-    transmission: 'Автомат',
-    mileage: '0',
-    type: 'Седан',
-    brand: 'BMW',
-    images: [
-      '/img/35658ce2-0e0f-41a4-a417-c35990cabc29.jpg',
-      '/img/b6e0d970-0bdc-442d-af99-f0a51ff0863e.jpg',
-      '/img/8da9e761-2e1b-453f-9c89-1afd4df236ee.jpg'
-    ],
-    features: ['Кожаный салон', 'Подогрев сидений', 'Навигация', 'Климат-контроль', 'Bluetooth', 'USB', 'Круиз-контроль', 'Парктроник'],
-    engine: '2.0L турбо',
-    power: '184 л.с.',
-    acceleration: '7.1 сек',
-    consumption: '6.8 л/100км',
-    drive: 'Задний привод',
-    color: 'Серебристый металлик',
-    vin: 'WBAVA31070NL12345',
-    description: 'Элегантный и динамичный BMW 3 Series представляет собой идеальное сочетание спортивности и комфорта. Этот седан оснащен передовыми технологиями и обеспечивает превосходное качество вождения. Автомобиль находится в идеальном состоянии и готов к передаче новому владельцу.',
-    specs: {
-      dimensions: '4709×1827×1442 мм',
-      trunk: '480 л',
-      weight: '1570 кг',
-      fuelTank: '59 л',
-      maxSpeed: '235 км/ч',
-      doors: '4',
-      seats: '5',
-      wheelbase: '2851 мм'
-    },
-    equipment: {
-      safety: ['ABS', 'ESP', 'Подушки безопасности', 'Система контроля давления в шинах', 'Система помощи при экстренном торможении'],
-      comfort: ['Кондиционер', 'Подогрев сидений', 'Электростеклоподъемники', 'Центральный замок', 'Круиз-контроль'],
-      multimedia: ['Мультимедийная система', 'Bluetooth', 'USB', 'AUX', 'Навигация'],
-      exterior: ['LED фары', 'Легкосплавные диски', 'Тонированные стекла', 'Электрозеркала']
+  const { data: car, isLoading: carLoading, error } = useCar(id || '');
+  const { data: similarCars } = useSimilarCars(id || '');
+  const createContactMutation = useCreateContact();
+
+  useEffect(() => {
+    if (car && car.images.length > 0) {
+      setSelectedImage(0);
     }
-  };
+  }, [car]);
 
-  const formatPrice = (price: number) => {
-    return price.toLocaleString('ru-RU');
-  };
+  if (carLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded mb-4"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <div className="h-96 bg-gray-200 rounded-lg mb-8"></div>
+                <div className="space-y-4">
+                  <div className="h-6 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+              <div>
+                <div className="h-64 bg-gray-200 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !car) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Icon name="AlertCircle" size={48} className="mx-auto text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Автомобиль не найден</h2>
+          <p className="text-gray-600 mb-4">Возможно, автомобиль был продан или снят с продажи</p>
+          <Link to="/catalog">
+            <Button>Вернуться к каталогу</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const ContactForm = () => {
-    const [formData, setFormData] = useState({
-      name: '',
-      phone: '',
-      email: '',
-      message: ''
-    });
-
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Здесь была бы отправка формы
-      console.log('Form submitted:', formData);
+      
+      createContactMutation.mutate({
+        name: contactForm.name,
+        phone: contactForm.phone,
+        email: contactForm.email,
+        subject: 'Покупка автомобиля',
+        message: contactForm.message || `Интересует автомобиль: ${car.name}`,
+        source: 'website',
+        relatedCar: car._id,
+        customerType: 'new'
+      }, {
+        onSuccess: () => {
+          toast({
+            title: "Заявка отправлена",
+            description: "Наш менеджер свяжется с вами в ближайшее время",
+          });
+          setContactForm({ name: '', phone: '', email: '', message: '' });
+        },
+        onError: () => {
+          toast({
+            title: "Ошибка",
+            description: "Не удалось отправить заявку. Попробуйте еще раз.",
+            variant: "destructive",
+          });
+        }
+      });
     };
 
     return (
@@ -80,8 +109,8 @@ const CarDetail = () => {
           <label className="text-sm font-medium mb-1 block">Имя *</label>
           <Input
             required
-            value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            value={contactForm.name}
+            onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
             placeholder="Ваше имя"
           />
         </div>
@@ -90,8 +119,8 @@ const CarDetail = () => {
           <Input
             required
             type="tel"
-            value={formData.phone}
-            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+            value={contactForm.phone}
+            onChange={(e) => setContactForm({...contactForm, phone: e.target.value})}
             placeholder="+7 (999) 123-45-67"
           />
         </div>
@@ -99,21 +128,26 @@ const CarDetail = () => {
           <label className="text-sm font-medium mb-1 block">Email</label>
           <Input
             type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            value={contactForm.email}
+            onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
             placeholder="your@email.com"
           />
         </div>
         <div>
           <label className="text-sm font-medium mb-1 block">Сообщение</label>
           <Textarea
-            value={formData.message}
-            onChange={(e) => setFormData({...formData, message: e.target.value})}
+            value={contactForm.message}
+            onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
             placeholder="Дополнительная информация..."
             rows={3}
           />
         </div>
-        <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+        <Button 
+          type="submit" 
+          className="w-full bg-primary hover:bg-primary/90"
+          disabled={createContactMutation.isPending}
+        >
+          {createContactMutation.isPending ? 'Отправка...' : 'Отправить заявку'}
           Отправить заявку
         </Button>
       </form>
@@ -143,13 +177,14 @@ const CarDetail = () => {
             <div className="mb-8">
               <div className="relative mb-4">
                 <img 
-                  src={car.images[selectedImage]} 
+                  src={getImageUrl(car.images[selectedImage])} 
                   alt={car.name}
                   className="w-full h-96 object-cover rounded-lg"
                 />
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
-                  <Badge className="bg-green-600">Новый</Badge>
-                  <Badge className="bg-primary">В наличии</Badge>
+                  {car.condition === 'Новый' && <Badge className="bg-green-600">Новый</Badge>}
+                  {car.availability === 'В наличии' && <Badge className="bg-primary">В наличии</Badge>}
+                  {car.isHit && <Badge className="bg-orange-600">Хит продаж</Badge>}
                 </div>
               </div>
               <div className="flex gap-2 overflow-x-auto">
@@ -161,7 +196,7 @@ const CarDetail = () => {
                       selectedImage === index ? 'border-primary' : 'border-gray-200'
                     }`}
                   >
-                    <img src={image} alt={`${car.name} ${index + 1}`} className="w-full h-full object-cover" />
+                    <img src={getImageUrl(image)} alt={`${car.name} ${index + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -185,18 +220,18 @@ const CarDetail = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
                     <Icon name="Zap" size={24} className="text-primary mx-auto mb-2" />
-                    <div className="font-semibold">{car.engine}</div>
-                    <div className="text-sm text-gray-600">{car.power}</div>
+                    <div className="font-semibold">{car.engine.volume}L {car.engine.type}</div>
+                    <div className="text-sm text-gray-600">{car.engine.power} л.с.</div>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
                     <Icon name="Activity" size={24} className="text-primary mx-auto mb-2" />
                     <div className="font-semibold">0-100 км/ч</div>
-                    <div className="text-sm text-gray-600">{car.acceleration}</div>
+                    <div className="text-sm text-gray-600">{car.specifications.acceleration} сек</div>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
                     <Icon name="Gauge" size={24} className="text-primary mx-auto mb-2" />
                     <div className="font-semibold">Расход</div>
-                    <div className="text-sm text-gray-600">{car.consumption}</div>
+                    <div className="text-sm text-gray-600">{car.specifications.consumption} л/100км</div>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
                     <Icon name="Settings" size={24} className="text-primary mx-auto mb-2" />
@@ -213,11 +248,11 @@ const CarDetail = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Двигатель:</span>
-                        <span>{car.engine}</span>
+                        <span>{car.engine.volume}L {car.engine.type}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Мощность:</span>
-                        <span>{car.power}</span>
+                        <span>{car.engine.power} л.с.</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Привод:</span>
@@ -229,11 +264,11 @@ const CarDetail = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Макс. скорость:</span>
-                        <span>{car.specs.maxSpeed}</span>
+                        <span>{car.specifications.maxSpeed} км/ч</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Разгон 0-100:</span>
-                        <span>{car.acceleration}</span>
+                        <span>{car.specifications.acceleration} сек</span>
                       </div>
                     </div>
                   </div>
@@ -243,31 +278,31 @@ const CarDetail = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Размеры:</span>
-                        <span>{car.specs.dimensions}</span>
+                        <span>{car.specifications.dimensions.length}×{car.specifications.dimensions.width}×{car.specifications.dimensions.height} мм</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Колесная база:</span>
-                        <span>{car.specs.wheelbase}</span>
+                        <span>{car.specifications.dimensions.wheelbase} мм</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Багажник:</span>
-                        <span>{car.specs.trunk}</span>
+                        <span>{car.specifications.trunkVolume} л</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Масса:</span>
-                        <span>{car.specs.weight}</span>
+                        <span>{car.specifications.weight} кг</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Топливный бак:</span>
-                        <span>{car.specs.fuelTank}</span>
+                        <span>{car.specifications.fuelTank} л</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Количество дверей:</span>
-                        <span>{car.specs.doors}</span>
+                        <span>{car.specifications.doors}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Количество мест:</span>
-                        <span>{car.specs.seats}</span>
+                        <span>{car.specifications.seats}</span>
                       </div>
                     </div>
                   </div>
@@ -275,25 +310,50 @@ const CarDetail = () => {
               </TabsContent>
               
               <TabsContent value="equipment" className="space-y-6 mt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {Object.entries(car.equipment).map(([category, items]) => (
-                    <div key={category}>
-                      <h4 className="font-semibold mb-3 text-secondary capitalize">
-                        {category === 'safety' && 'Безопасность'}
-                        {category === 'comfort' && 'Комфорт'}
-                        {category === 'multimedia' && 'Мультимедиа'}
-                        {category === 'exterior' && 'Экстерьер'}
-                      </h4>
-                      <div className="space-y-2">
-                        {items.map((item, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <Icon name="Check" size={16} className="text-green-600" />
-                            <span className="text-sm">{item}</span>
-                          </div>
-                        ))}
+                <div>
+                  <h4 className="font-semibold mb-3 text-secondary">Комплектация и опции</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {car.features.map((feature, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Icon name="Check" size={16} className="text-green-600" />
+                        <span className="text-sm">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold mb-3 text-secondary">Основные характеристики</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Тип кузова:</span>
+                        <span>{car.bodyType}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Цвет:</span>
+                        <span>{car.color}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Состояние:</span>
+                        <span>{car.condition}</span>
                       </div>
                     </div>
-                  ))}
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Пробег:</span>
+                        <span>{car.mileage.toLocaleString()} км</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Просмотры:</span>
+                        <span>{car.views}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Наличие:</span>
+                        <span>{car.availability}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
               
@@ -315,7 +375,7 @@ const CarDetail = () => {
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <h5 className="font-medium mb-2">Пробег</h5>
-                      <p className="text-sm text-gray-600">{car.mileage} км</p>
+                      <p className="text-sm text-gray-600">{car.mileage.toLocaleString()} км</p>
                     </div>
                   </div>
                   
@@ -363,7 +423,7 @@ const CarDetail = () => {
                     </div>
                     <div>
                       <span className="text-gray-600">Пробег:</span>
-                      <div className="font-medium">{car.mileage} км</div>
+                      <div className="font-medium">{car.mileage.toLocaleString()} км</div>
                     </div>
                     <div>
                       <span className="text-gray-600">Топливо:</span>
@@ -468,6 +528,46 @@ const CarDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* Similar Cars */}
+        {similarCars && similarCars.length > 0 && (
+          <section className="mt-16">
+            <h2 className="text-3xl font-bold text-secondary mb-8">Похожие автомобили</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {similarCars.slice(0, 3).map((similarCar) => (
+                <Card key={similarCar._id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+                  <div className="relative overflow-hidden">
+                    <img 
+                      src={getImageUrl(similarCar.images[0])} 
+                      alt={similarCar.name}
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {similarCar.isHit && <Badge className="absolute top-4 right-4 bg-primary">Хит</Badge>}
+                  </div>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{similarCar.name}</CardTitle>
+                    <div className="text-xl font-bold text-primary">{formatPrice(similarCar.price)} ₽</div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-2 mb-4 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <Icon name="Calendar" size={14} className="mr-1" />
+                        {similarCar.year}
+                      </div>
+                      <div className="flex items-center">
+                        <Icon name="Activity" size={14} className="mr-1" />
+                        {similarCar.mileage.toLocaleString()} км
+                      </div>
+                    </div>
+                    <Link to={`/car/${similarCar._id}`}>
+                      <Button className="w-full">Подробнее</Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

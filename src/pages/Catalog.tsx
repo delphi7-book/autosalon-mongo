@@ -1,143 +1,84 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { useCars, useBrands, useCategories } from '@/hooks/useApi';
+import { formatPrice, getImageUrl } from '@/lib/utils';
 import Icon from '@/components/ui/icon';
 
 const Catalog = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [priceRange, setPriceRange] = useState([0, 10000000]);
   const [sortBy, setSortBy] = useState('price-asc');
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const cars = [
-    {
-      id: 1,
-      name: 'BMW 3 Series',
-      price: 2890000,
-      year: 2024,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '0',
-      type: 'Седан',
-      brand: 'BMW',
-      image: '/img/35658ce2-0e0f-41a4-a417-c35990cabc29.jpg',
-      features: ['Кожаный салон', 'Подогрев сидений', 'Навигация', 'Климат-контроль'],
-      isNew: true,
-      isHit: false
-    },
-    {
-      id: 2,
-      name: 'Audi Q5',
-      price: 3450000,
-      year: 2024,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '0',
-      type: 'Кроссовер',
-      brand: 'Audi',
-      image: '/img/b6e0d970-0bdc-442d-af99-f0a51ff0863e.jpg',
-      features: ['Полный привод', 'Панорамная крыша', 'LED фары', 'Virtual Cockpit'],
-      isNew: true,
-      isHit: true
-    },
-    {
-      id: 3,
-      name: 'Mercedes C-Class Coupe',
-      price: 4120000,
-      year: 2024,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '0',
-      type: 'Купе',
-      brand: 'Mercedes',
-      image: '/img/8da9e761-2e1b-453f-9c89-1afd4df236ee.jpg',
-      features: ['AMG пакет', 'Премиум звук', 'Автопилот', 'Панорамная крыша'],
-      isNew: true,
-      isHit: false
-    },
-    {
-      id: 4,
-      name: 'BMW X5',
-      price: 5200000,
-      year: 2023,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '15000',
-      type: 'Кроссовер',
-      brand: 'BMW',
-      image: '/img/35658ce2-0e0f-41a4-a417-c35990cabc29.jpg',
-      features: ['xDrive', 'Harman Kardon', 'Головной дисплей', 'Массаж сидений'],
-      isNew: false,
-      isHit: false
-    },
-    {
-      id: 5,
-      name: 'Audi A4',
-      price: 2650000,
-      year: 2023,
-      fuel: 'Бензин',
-      transmission: 'Автомат',
-      mileage: '8500',
-      type: 'Седан',
-      brand: 'Audi',
-      image: '/img/b6e0d970-0bdc-442d-af99-f0a51ff0863e.jpg',
-      features: ['quattro', 'Matrix LED', 'Bang & Olufsen', 'Адаптивная подвеска'],
-      isNew: false,
-      isHit: true
-    },
-    {
-      id: 6,
-      name: 'Mercedes E-Class',
-      price: 3890000,
-      year: 2023,
-      fuel: 'Гибрид',
-      transmission: 'Автомат',
-      mileage: '12000',
-      type: 'Седан',
-      brand: 'Mercedes',
-      image: '/img/8da9e761-2e1b-453f-9c89-1afd4df236ee.jpg',
-      features: ['MBUX', 'Air Body Control', 'Burmester', 'Multibeam LED'],
-      isNew: false,
-      isHit: false
+  // Инициализация фильтров из URL
+  useEffect(() => {
+    const search = searchParams.get('search');
+    const brand = searchParams.get('brand');
+    const category = searchParams.get('category');
+    const minPrice = searchParams.get('minPrice');
+    const maxPrice = searchParams.get('maxPrice');
+    
+    if (search) setSearchTerm(search);
+    if (brand) setSelectedBrand(brand);
+    if (category) setSelectedType(category);
+    if (minPrice || maxPrice) {
+      setPriceRange([
+        minPrice ? parseInt(minPrice) : 0,
+        maxPrice ? parseInt(maxPrice) : 10000000
+      ]);
     }
-  ];
+  }, [searchParams]);
 
-  const brands = ['BMW', 'Audi', 'Mercedes'];
-  const types = ['Седан', 'Кроссовер', 'Купе'];
-
-  const filteredCars = cars.filter(car => {
-    return (
-      car.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (selectedBrand === 'all' || car.brand === selectedBrand) &&
-      (selectedType === 'all' || car.type === selectedType) &&
-      car.price >= priceRange[0] && car.price <= priceRange[1]
-    );
-  });
-
-  const sortedCars = [...filteredCars].sort((a, b) => {
-    switch (sortBy) {
-      case 'price-asc':
-        return a.price - b.price;
-      case 'price-desc':
-        return b.price - a.price;
-      case 'year-desc':
-        return b.year - a.year;
-      case 'name-asc':
-        return a.name.localeCompare(b.name);
-      default:
-        return 0;
-    }
-  });
-
-  const formatPrice = (price: number) => {
-    return price.toLocaleString('ru-RU');
+  // Загрузка данных
+  const { data: brandsData } = useBrands();
+  const { data: categoriesData } = useCategories();
+  
+  const carsParams = {
+    page: currentPage,
+    limit: 12,
+    ...(searchTerm && { search: searchTerm }),
+    ...(selectedBrand !== 'all' && { brand: selectedBrand }),
+    ...(selectedType !== 'all' && { bodyType: selectedType }),
+    ...(priceRange[0] > 0 && { minPrice: priceRange[0] }),
+    ...(priceRange[1] < 10000000 && { maxPrice: priceRange[1] }),
+    sortBy: sortBy.split('-')[0],
+    sortOrder: sortBy.split('-')[1]
   };
+  
+  const { data: carsData, isLoading: carsLoading } = useCars(carsParams);
+
+  const brands = brandsData || [];
+  const categories = categoriesData || [];
+  const cars = carsData?.cars || [];
+  const totalPages = carsData?.totalPages || 1;
+  const total = carsData?.total || 0;
+
+  // Обновление URL при изменении фильтров
+  const updateFilters = () => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set('search', searchTerm);
+    if (selectedBrand !== 'all') params.set('brand', selectedBrand);
+    if (selectedType !== 'all') params.set('category', selectedType);
+    if (priceRange[0] > 0) params.set('minPrice', priceRange[0].toString());
+    if (priceRange[1] < 10000000) params.set('maxPrice', priceRange[1].toString());
+    
+    setSearchParams(params);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(updateFilters, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, selectedBrand, selectedType, priceRange]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -181,7 +122,7 @@ const Catalog = () => {
                     <SelectContent>
                       <SelectItem value="all">Все марки</SelectItem>
                       {brands.map(brand => (
-                        <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                        <SelectItem key={brand._id} value={brand._id}>{brand.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -196,8 +137,8 @@ const Catalog = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Все типы</SelectItem>
-                      {types.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      {categories.map(category => (
+                        <SelectItem key={category._id} value={category.name}>{category.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -241,7 +182,7 @@ const Catalog = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-secondary">
-                  Найдено {sortedCars.length} автомобилей
+                  Найдено {total} автомобилей
                 </h2>
               </div>
               <div className="flex items-center gap-2">
@@ -261,7 +202,26 @@ const Catalog = () => {
             </div>
 
             {/* Cars Grid */}
-            {sortedCars.length === 0 ? (
+            {carsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Card key={i} className="animate-pulse">
+                    <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                    <CardHeader>
+                      <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-8 bg-gray-200 rounded"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 rounded"></div>
+                        <div className="h-4 bg-gray-200 rounded"></div>
+                        <div className="h-10 bg-gray-200 rounded"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : cars.length === 0 ? (
               <div className="text-center py-12">
                 <Icon name="Search" size={48} className="mx-auto text-gray-400 mb-4" />
                 <h3 className="text-xl font-semibold text-gray-600 mb-2">Автомобили не найдены</h3>
@@ -269,17 +229,18 @@ const Catalog = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {sortedCars.map((car) => (
-                  <Card key={car.id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden">
+                {cars.map((car) => (
+                  <Card key={car._id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden">
                     <div className="relative overflow-hidden">
                       <img 
-                        src={car.image} 
+                        src={getImageUrl(car.images[0])} 
                         alt={car.name}
                         className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <div className="absolute top-4 right-4 flex flex-col gap-2">
                         {car.isNew && <Badge className="bg-green-600">Новый</Badge>}
                         {car.isHit && <Badge className="bg-primary">Хит</Badge>}
+                        {car.availability === 'В наличии' && <Badge className="bg-blue-600">В наличии</Badge>}
                       </div>
                     </div>
                     <CardHeader className="pb-2">
@@ -302,7 +263,7 @@ const Catalog = () => {
                         </div>
                         <div className="flex items-center">
                           <Icon name="Activity" size={14} className="mr-1" />
-                          {car.mileage} км
+                          {car.mileage.toLocaleString()} км
                         </div>
                       </div>
                       
@@ -320,7 +281,7 @@ const Catalog = () => {
                       </div>
 
                       <div className="flex gap-2">
-                        <Link to={`/car/${car.id}`} className="flex-1">
+                        <Link to={`/car/${car._id}`} className="flex-1">
                           <Button className="w-full bg-primary hover:bg-primary/90">
                             Подробнее
                           </Button>
@@ -335,12 +296,41 @@ const Catalog = () => {
               </div>
             )}
 
-            {/* Load More Button */}
-            {sortedCars.length > 0 && (
-              <div className="text-center mt-8">
-                <Button variant="outline" size="lg">
-                  Загрузить еще
-                  <Icon name="ChevronDown" size={16} className="ml-2" />
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center mt-8 space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <Icon name="ChevronLeft" size={16} className="mr-2" />
+                  Назад
+                </Button>
+                
+                <div className="flex items-center space-x-2">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const page = i + 1;
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Вперед
+                  <Icon name="ChevronRight" size={16} className="ml-2" />
                 </Button>
               </div>
             )}

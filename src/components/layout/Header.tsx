@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useBrands } from '@/hooks/useApi';
 import Icon from '@/components/ui/icon';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { data: brands } = useBrands();
 
   const navigation = [
     { name: 'Главная', href: '/' },
@@ -18,6 +20,12 @@ const Header = () => {
     { name: 'О нас', href: '/about' },
     { name: 'Контакты', href: '/contacts' }
   ];
+
+  // Добавляем динамические ссылки на бренды
+  const brandLinks = brands?.slice(0, 3).map(brand => ({
+    name: brand.name,
+    href: `/catalog?brand=${brand._id}`
+  })) || [];
 
   const isActive = (href: string) => {
     if (href === '/') {

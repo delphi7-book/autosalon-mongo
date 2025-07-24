@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCreateContact } from '@/hooks/useApi';
+import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
 
 const Contacts = () => {
@@ -21,6 +23,8 @@ const Contacts = () => {
     phone: '',
     time: ''
   });
+
+  const createContactMutation = useCreateContact();
 
   const departments = [
     {
@@ -113,13 +117,70 @@ const Contacts = () => {
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Contact form:', contactForm);
+    
+    createContactMutation.mutate({
+      name: contactForm.name,
+      phone: contactForm.phone,
+      email: contactForm.email,
+      subject: contactForm.subject,
+      message: contactForm.message,
+      source: 'website',
+      customerType: 'new'
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "Сообщение отправлено",
+          description: "Мы ответим вам в ближайшее время",
+        });
+        setContactForm({
+          name: '',
+          phone: '',
+          email: '',
+          subject: '',
+          message: ''
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Ошибка",
+          description: "Не удалось отправить сообщение. Попробуйте еще раз.",
+          variant: "destructive",
+        });
+      }
+    });
     // Здесь была бы отправка формы
   };
 
   const handleCallbackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Callback form:', callbackForm);
+    
+    createContactMutation.mutate({
+      name: callbackForm.name,
+      phone: callbackForm.phone,
+      subject: 'Заказ обратного звонка',
+      message: `Прошу перезвонить в удобное время: ${callbackForm.time}`,
+      source: 'website',
+      customerType: 'new'
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "Заявка принята",
+          description: "Мы перезвоним вам в указанное время",
+        });
+        setCallbackForm({
+          name: '',
+          phone: '',
+          time: ''
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Ошибка",
+          description: "Не удалось отправить заявку. Попробуйте еще раз.",
+          variant: "destructive",
+        });
+      }
+    });
     // Здесь была бы отправка формы
   };
 
@@ -394,7 +455,11 @@ const Contacts = () => {
                     <Icon name="Map" size={48} className="mx-auto mb-2" />
                     <p>Интерактивная карта с нашими адресами</p>
                   </div>
-                </div>
+                  <Button 
+                    type="submit" 
+                    {createContactMutation.isPending ? 'Отправка...' : 'Отправить сообщение'}
+                    disabled={createContactMutation.isPending}
+                  >
               </CardContent>
             </Card>
           </TabsContent>
@@ -500,9 +565,13 @@ const Contacts = () => {
                         rows={5}
                       />
                     </div>
-                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-primary hover:bg-primary/90"
+                      disabled={createContactMutation.isPending}
+                    >
                       <Icon name="Send" size={16} className="mr-2" />
-                      Отправить сообщение
+                      {createContactMutation.isPending ? 'Отправка...' : 'Заказать звонок'}
                     </Button>
                   </form>
                 </CardContent>

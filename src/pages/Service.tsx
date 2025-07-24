@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,10 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useServices, useCreateAppointment } from '@/hooks/useApi';
+import { formatPrice } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
 
 const Service = () => {
   const [selectedService, setSelectedService] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [bookingForm, setBookingForm] = useState({
     name: '',
     phone: '',
@@ -22,44 +26,20 @@ const Service = () => {
     description: ''
   });
 
-  const services = [
-    {
-      category: 'Техническое обслуживание',
-      items: [
-        { name: 'ТО-1 (15 000 км)', price: 'от 8 500', duration: '2-3 часа', description: 'Базовое техническое обслуживание' },
-        { name: 'ТО-2 (30 000 км)', price: 'от 12 500', duration: '3-4 часа', description: 'Расширенное техническое обслуживание' },
-        { name: 'ТО-3 (45 000 км)', price: 'от 15 500', duration: '4-5 часов', description: 'Полное техническое обслуживание' },
-        { name: 'Предпродажная подготовка', price: 'от 25 000', duration: '1-2 дня', description: 'Комплексная подготовка к продаже' }
-      ]
-    },
-    {
-      category: 'Диагностика',
-      items: [
-        { name: 'Компьютерная диагностика', price: 'от 2 500', duration: '1 час', description: 'Полная диагностика всех систем' },
-        { name: 'Диагностика двигателя', price: 'от 3 500', duration: '1-2 часа', description: 'Углубленная диагностика двигателя' },
-        { name: 'Диагностика подвески', price: 'от 2 000', duration: '1 час', description: 'Проверка состояния подвески' },
-        { name: 'Диагностика тормозной системы', price: 'от 1 500', duration: '30 мин', description: 'Проверка тормозов и ABS' }
-      ]
-    },
-    {
-      category: 'Ремонт двигателя',
-      items: [
-        { name: 'Замена масла и фильтров', price: 'от 3 500', duration: '1 час', description: 'Замена моторного масла и фильтров' },
-        { name: 'Замена свечей зажигания', price: 'от 2 500', duration: '1 час', description: 'Замена свечей и катушек зажигания' },
-        { name: 'Ремонт системы охлаждения', price: 'от 8 500', duration: '2-4 часа', description: 'Ремонт радиатора, помпы, термостата' },
-        { name: 'Капитальный ремонт двигателя', price: 'от 150 000', duration: '5-10 дней', description: 'Полный ремонт двигателя' }
-      ]
-    },
-    {
-      category: 'Кузовной ремонт',
-      items: [
-        { name: 'Покраска элемента', price: 'от 15 000', duration: '2-3 дня', description: 'Покраска одного элемента кузова' },
-        { name: 'Рихтовка и покраска', price: 'от 25 000', duration: '3-5 дней', description: 'Восстановление геометрии и покраска' },
-        { name: 'Полировка кузова', price: 'от 8 500', duration: '1 день', description: 'Восстановительная полировка' },
-        { name: 'Антикоррозийная обработка', price: 'от 12 000', duration: '1 день', description: 'Защита от коррозии' }
-      ]
-    }
-  ];
+  const { data: servicesData, isLoading: servicesLoading } = useServices({
+    category: selectedCategory !== 'all' ? selectedCategory : undefined,
+    isActive: true
+  });
+  const createAppointmentMutation = useCreateAppointment();
+
+  const services = servicesData || [];
+  const categories = [...new Set(services.map(service => service.category))];
+
+  // Группировка услуг по категориям
+  const groupedServices = categories.reduce((acc, category) => {
+    acc[category] = services.filter(service => service.category === category);
+    return acc;
+  }, {} as Record<string, typeof services>);
 
   const specialists = [
     {
@@ -90,7 +70,53 @@ const Service = () => {
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Service booking:', { ...bookingForm, service: selectedService });
+    
+    const selectedServiceData = services.find(s => s.name === selectedService);
+    
+    createAppointmentMutation.mutate({
+      type: 'service',
+      service: selectedServiceData?._id,
+      date: new Date().toISOString().split('T')[0], // Сегодняшняя дата как заглушка
+      time: '10:00', // Время по умолчанию
+      customerInfo: {
+        name: bookingForm.name,
+        phone: bookingForm.phone,
+        email: bookingForm.email
+      },
+      carInfo: {
+        brand: bookingForm.carModel.split(' ')[0],
+        model: bookingForm.carModel,
+        year: bookingForm.year ? parseInt(bookingForm.year) : undefined,
+        vin: bookingForm.vin,
+        mileage: bookingForm.mileage ? parseInt(bookingForm.mileage) : undefined,
+        issues: bookingForm.description
+      },
+      notes: bookingForm.description
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "Запись создана",
+          description: "Мы свяжемся с вами для подтверждения времени",
+        });
+        setBookingForm({
+          name: '',
+          phone: '',
+          email: '',
+          carModel: '',
+          year: '',
+          vin: '',
+          mileage: '',
+          description: ''
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Ошибка",
+          description: "Не удалось создать запись. Попробуйте еще раз.",
+          variant: "destructive",
+        });
+      }
+    });
   };
 
   const BookingForm = () => (
@@ -176,8 +202,12 @@ const Service = () => {
         />
       </div>
 
-      <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-        Записаться на сервис
+      <Button 
+        type="submit" 
+        className="w-full bg-primary hover:bg-primary/90"
+        disabled={createAppointmentMutation.isPending}
+      >
+        {createAppointmentMutation.isPending ? 'Отправка...' : 'Записаться на сервис'}
       </Button>
     </form>
   );
@@ -204,50 +234,84 @@ const Service = () => {
           <TabsContent value="services">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
-                <div className="space-y-8">
-                  {services.map((category, categoryIndex) => (
-                    <div key={categoryIndex}>
-                      <h2 className="text-2xl font-bold text-secondary mb-6">{category.category}</h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {category.items.map((service, serviceIndex) => (
-                          <Card key={serviceIndex} className="hover:shadow-lg transition-shadow">
-                            <CardHeader className="pb-3">
-                              <div className="flex justify-between items-start">
-                                <CardTitle className="text-lg">{service.name}</CardTitle>
-                                <Badge variant="outline">{service.price} ₽</Badge>
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-gray-600 text-sm mb-3">{service.description}</p>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <Icon name="Clock" size={14} className="mr-1" />
-                                  {service.duration}
-                                </div>
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button 
-                                      size="sm" 
-                                      onClick={() => setSelectedService(service.name)}
-                                    >
-                                      Записаться
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>Запись на сервис: {service.name}</DialogTitle>
-                                    </DialogHeader>
-                                    <BookingForm />
-                                  </DialogContent>
-                                </Dialog>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                {/* Category Filter */}
+                <div className="mb-6">
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Выберите категорию" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все категории</SelectItem>
+                      {categories.map(category => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                {servicesLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Card key={i} className="animate-pulse">
+                        <CardHeader>
+                          <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                          <div className="h-4 bg-gray-200 rounded"></div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                          <div className="h-10 bg-gray-200 rounded"></div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {Object.entries(groupedServices).map(([category, categoryServices]) => (
+                      <div key={category}>
+                        <h2 className="text-2xl font-bold text-secondary mb-6">{category}</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {categoryServices.map((service) => (
+                            <Card key={service._id} className="hover:shadow-lg transition-shadow">
+                              <CardHeader className="pb-3">
+                                <div className="flex justify-between items-start">
+                                  <CardTitle className="text-lg">{service.name}</CardTitle>
+                                  <Badge variant="outline">
+                                    от {formatPrice(service.price.from)} ₽
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-gray-600 text-sm mb-3">{service.description}</p>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center text-sm text-gray-500">
+                                    <Icon name="Clock" size={14} className="mr-1" />
+                                    {service.duration}
+                                  </div>
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button 
+                                        size="sm" 
+                                        onClick={() => setSelectedService(service.name)}
+                                      >
+                                        Записаться
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Запись на сервис: {service.name}</DialogTitle>
+                                      </DialogHeader>
+                                      <BookingForm />
+                                    </DialogContent>
+                                  </Dialog>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -260,15 +324,14 @@ const Service = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="text-sm font-medium mb-2 block">Тип услуги</label>
-                          <Select>
+                          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                             <SelectTrigger>
                               <SelectValue placeholder="Выберите услугу" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="to">Техническое обслуживание</SelectItem>
-                              <SelectItem value="diagnostics">Диагностика</SelectItem>
-                              <SelectItem value="repair">Ремонт</SelectItem>
-                              <SelectItem value="body">Кузовной ремонт</SelectItem>
+                              {categories.map(category => (
+                                <SelectItem key={category} value={category}>{category}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>

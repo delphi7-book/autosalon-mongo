@@ -1,8 +1,11 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useBrands } from '@/hooks/useApi';
 import Icon from '@/components/ui/icon';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const navigate = useNavigate();
+  const { data: brands } = useBrands();
 
   const footerSections = [
     {
@@ -22,19 +25,18 @@ const Footer = () => {
         { name: 'О компании', href: '/about' },
         { name: 'Гарантия', href: '/warranty' },
         { name: 'Контакты', href: '/contacts' },
-        { name: 'Вакансии', href: '/careers' },
-        { name: 'Новости', href: '/news' },
-        { name: 'Отзывы', href: '/reviews' }
+        { name: 'Вакансии', href: '#' },
+        { name: 'Новости', href: '#' },
+        { name: 'Отзывы', href: '#' }
       ]
     },
     {
       title: 'Марки',
       links: [
-        { name: 'BMW', href: '/catalog?brand=bmw' },
-        { name: 'Audi', href: '/catalog?brand=audi' },
-        { name: 'Mercedes-Benz', href: '/catalog?brand=mercedes' },
-        { name: 'Volkswagen', href: '/catalog?brand=volkswagen' },
-        { name: 'Porsche', href: '/catalog?brand=porsche' },
+        ...(brands?.slice(0, 5).map(brand => ({
+          name: brand.name,
+          href: `/catalog?brand=${brand._id}`
+        })) || []),
         { name: 'Все марки', href: '/catalog' }
       ]
     }
